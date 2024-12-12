@@ -1,9 +1,12 @@
-local M = {}
-
-function M.setup()
-    M.config = {
-        insert_strategy = "end", -- Default strategy: "end", "before_cursor", "in_scope"
+local funcy = {
+    config = {
+        insert_strategy = "before_cursor", -- Default strategy: "end", "before_cursor", "in_scope"
     }
+}
+
+function funcy.setup()
+    -- Allow users to override the default configuration during setup
+    funcy.config = vim.tbl_extend("force", funcy.config, user_config or {})
 end
 
 local function extract_function_info(line)
@@ -65,17 +68,38 @@ end
 -- my_function2(arg3, arg4)
 
 -- Function to determine where to insert the function definition
-local function find_insert_position()
+local function find_insert_position(strategy)
     local current_line_num = vim.api.nvim_win_get_cursor(0)[1]
     -- this line is to get the number of lines in the buffer
     local buffer_len = vim.api.nvim_buf_line_count(0)
     local insert_line_num = buffer_len -- Default to end of file
 
-    for i = current_line_num, buffer_len do
-        local line = vim.api.nvim_buf_get_lines(0, i - 1, i, false)[1]
-        if line:match("^function ") or line:match("^def ") or line:match("^function ") then
-            insert_line_num = i
-            break
+    if strategy == "before_cursor" then
+        return current_line_num
+    elseif strategy == "in_scope" then
+        -- Using Treesitter or regex-based logic for language-aware placement
+        local scope_start = nil
+        local scope_end = nil
+        for i = current_line_num, 1, -1 do
+            local line = vim.api.nvim_buf_get_lines(0, i - 1, i, false)[1]
+            if line:match("^class ") or line:match("^function ") or line:match("^def ") then
+                scope_start = i
+                break
+            end
+        end
+        if scope_start then
+            for i = scope_start + 1, buffer_len do
+                local line = vim.api.nvim_buf_get_lines(0, i - 1, i, false)[1]
+                if line:match("^%s*end$") or line:match("^%s*$") then
+                    scope_end = i
+                    break
+                end
+            end
+        end
+        if scope_end then
+            insert_line_num = scope_end
+        else
+            insert_line_num = scope_start or buffer_len
         end
     end
 
@@ -83,7 +107,7 @@ local function find_insert_position()
 end
 
 -- Main function to create the function
-function M.create_function()
+function funcy.create_function()
     local line = vim.api.nvim_get_current_line()
     local function_name, args = extract_function_info(line)
     if not function_name then return end
@@ -91,7 +115,7 @@ function M.create_function()
     local function_def = generate_function_definition(function_name, args)
     if not function_def then return end
 
-    local insert_line_num = find_insert_position()
+    local insert_line_num = find_insert_position(funcy.config.insert_strategy)
 
     local function_lines = vim.split(function_def, "\n", true)
     vim.api.nvim_buf_set_lines(0, insert_line_num - 1, insert_line_num - 1, false, function_lines)
@@ -99,9 +123,9 @@ function M.create_function()
     vim.api.nvim_win_set_cursor(0, { insert_line_num + 1, 0 })
 end
 
-function M.create_functions()
+function funcy.create_functions()
     local start_line, end_line = vim.fn.line("'<"), vim.fn.line("'>")
-    local insert_line_num = find_insert_position()
+    local insert_line_num = find_insert_position(funcy.config.insert_strategy)
     local function_lines = {}
 
     for i = start_line, end_line do
@@ -125,11 +149,11 @@ function M.create_functions()
 end
 
 vim.api.nvim_create_user_command("CreateFunc", function()
-    M.create_function()
+    funcy.create_function()
 end, { nargs = 0 })
 
 vim.api.nvim_create_user_command("CreateFuncs", function()
-    M.create_functions()
+    funcy.create_functions()
 end, { nargs = 0, range = true })
 
 -- mappings

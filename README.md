@@ -1,2 +1,6 @@
 # funcy.nvim
-Create and modify function definitions based on function calls in Neovim
+Snippets plugin with function calls using plain Lua
+
+## Installation
+
+## Setup

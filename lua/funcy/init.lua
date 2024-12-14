@@ -1,3 +1,5 @@
+local templates = require('templates') -- language templates
+
 local funcy = {
     config = {
         insert_strategy = "before_cursor", -- Default strategy: "end", "before_cursor", "in_scope"
@@ -5,7 +7,7 @@ local funcy = {
 }
 
 function funcy.setup()
-    -- Allow users to override the default configuration during setup
+    -- configuration
     funcy.config = vim.tbl_extend("force", funcy.config, user_config or {})
 end
 
@@ -30,39 +32,29 @@ end
 
 -- Function to generate the function definition based on filetype
 local function generate_function_definition(function_name, args)
-  local filetype = vim.api.nvim_buf_get_option(0, "filetype")
-  local indent = string.rep(" ", vim.api.nvim_buf_get_option(0, 'shiftwidth'))
-  local function_def = ""
-
-  -- Generate generic argument names (arg1, arg2, ...)
-  local arg_names = {}
-  for i = 1, #args do
-    table.insert(arg_names, "arg" .. i)
-  end
-
-  if filetype == "lua" then
-    function_def = string.format("function %s(%s)\n", function_name, table.concat(arg_names, ", "))
-    for _, arg_name in ipairs(arg_names) do
-      function_def = function_def .. indent .. string.format("-- %s = ...\n", arg_name)
+    local filetype = vim.api.nvim_buf_get_option(0, "filetype")
+    local template = templates[filetype]
+    if not template then
+        print("Unsupported filetype: " .. filetype)
+        return nil
     end
-    function_def = function_def .. "end\n"
-  elseif filetype == "python" then
-    function_def = string.format("def %s(%s):\n", function_name, table.concat(arg_names, ", "))
-    for _, arg_name in ipairs(arg_names) do
-      function_def = function_def .. indent .. string.format("#  %s = ...\n", arg_name)
-    end
-  elseif filetype == "javascript" then
-    function_def = string.format("function %s(%s) {\n", function_name, table.concat(arg_names, ", "))
-    for _, arg_name in ipairs(arg_names) do
-      function_def = function_def .. indent .. string.format("  // %s = ...\n", arg_name)
-    end
-    function_def = function_def .. "}\n"
-  else
-    print("Unsupported filetype: " .. filetype)
-    return nil
-  end
 
-  return function_def
+    local params = {}
+    for i = 1, #args do
+        local param = string.char(96 + i)  -- 97 is ASCII for 'a'
+        table.insert(params, param)
+    end
+
+    local indent = string.rep(" ", vim.api.nvim_buf_get_option(0, 'shiftwidth'))
+    local function_def = string.format(template.header, function_name, table.concat(params, ", "))
+
+    -- function body
+    for i, param_name in ipairs(params) do
+        function_def = function_def .. string.format(template.body, indent, param_name)
+    end
+
+    function_def = function_def .. template.footer
+    return function_def
 end
 
 -- my_function2(arg3, arg4)
@@ -147,6 +139,10 @@ function funcy.create_functions()
         print("No valid function calls found in the selected lines.")
     end
 end
+
+vim.api.nvim_create_user_command("SetCallStrategy", function(opts)
+    funcy.set_strategy(opts.args)
+end, { nargs = 1 })
 
 vim.api.nvim_create_user_command("CreateFunc", function()
     funcy.create_function()

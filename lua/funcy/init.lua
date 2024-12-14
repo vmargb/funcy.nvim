@@ -1,4 +1,5 @@
-local templates = require('templates') -- language templates
+local templates = require('config.templates') -- language templates
+local utility = require('utility') -- helper functions
 
 local funcy = {
     config = {
@@ -67,14 +68,19 @@ local function find_insert_position(strategy)
     local insert_line_num = buffer_len -- Default to end of file
 
     if strategy == "before_cursor" then
+        -- Find an empty line before the current line
+        local empty_line = utility.find_empty_line_before(current_line_num)
+        if empty_line and not utility.has_function_between(empty_line, current_line_num - 1) then
+            return empty_line
+        end
+        -- Fallback to the current cursor position if no suitable empty line is found
         return current_line_num
     elseif strategy == "in_scope" then
-        -- Using Treesitter or regex-based logic for language-aware placement
-        local scope_start = nil
-        local scope_end = nil
+        -- Find the start and end of the current scope
+        local scope_start, scope_end = nil, nil
         for i = current_line_num, 1, -1 do
             local line = vim.api.nvim_buf_get_lines(0, i - 1, i, false)[1]
-            if line:match("^class ") or line:match("^function ") or line:match("^def ") then
+            if utility.is_function_definition(line) or line:match("^%s*class ") then
                 scope_start = i
                 break
             end
@@ -82,20 +88,21 @@ local function find_insert_position(strategy)
         if scope_start then
             for i = scope_start + 1, buffer_len do
                 local line = vim.api.nvim_buf_get_lines(0, i - 1, i, false)[1]
-                if line:match("^%s*end$") or line:match("^%s*$") then
+                if utility.is_empty_line(line) or line:match("^%s*end$") then
                     scope_end = i
                     break
                 end
             end
         end
         if scope_end then
-            insert_line_num = scope_end
+            return scope_end
         else
-            insert_line_num = scope_start or buffer_len
+            return scope_start or buffer_len
         end
     end
 
-    return insert_line_num
+    -- default to the end of the file
+    return buffer_len
 end
 
 -- Main function to create the function
@@ -110,8 +117,7 @@ function funcy.create_function()
     local insert_line_num = find_insert_position(funcy.config.insert_strategy)
 
     local function_lines = vim.split(function_def, "\n", true)
-    vim.api.nvim_buf_set_lines(0, insert_line_num - 1, insert_line_num - 1, false, function_lines)
-
+    vim.api.nvim_buf_set_lines(0, insert_line_num, insert_line_num, false, function_lines)
     vim.api.nvim_win_set_cursor(0, { insert_line_num + 1, 0 })
 end
 

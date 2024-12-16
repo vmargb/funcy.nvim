@@ -13,6 +13,30 @@ function M.default_type(filetype)
     return templates[filetype].default_type or false
 end
 
+function M.extract_types(args, current_line_num)
+    local types = {}
+
+    -- Look for parameter type annotations in the current function
+    for i = current_line_num, 1, -1 do
+        local line = vim.api.nvim_buf_get_lines(0, i - 1, i, false)[1]
+        -- check if the line has type information
+        for _, arg in ipairs(args) do
+            local type_match = line:match(arg .. "%s*:%s*([%w_]+)")
+            if type_match then
+                types[#types + 1] = type_match
+            end
+        end
+
+        -- Stop searching once a function definition or block start is found
+        if line:match("^%s*function") or line:match("^%s*%{") then
+            break
+        end
+    end
+
+    -- Return `nil` if no types were found
+    return #types > 0 and types or nil
+end
+
 function M.format_params(args, types, filetype)
     local requires_types = M.is_type_sensitive(filetype)
     if not requires_types then

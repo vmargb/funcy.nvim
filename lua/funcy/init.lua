@@ -1,5 +1,5 @@
-local templates = require('config.templates') -- language templates
-local utility = require('utility') -- helper functions
+local templates = require('config.templates') -- language templates local utility = require('utility') -- helper functions
+local utility = require('utility')
 local default_config = require('config.config')
 
 local funcy = {
@@ -28,10 +28,22 @@ local function extract_function_info(line)
     end
 
     local args, types = {}, {}
-    for arg in args_str:gmatch("[^,]+") do
-        local name, type_hint = arg:match("(%w+):?(%w*)")
+    local pattern = '[^,]+' -- Default pattern for non-quoted arguments
+
+    for arg in args_str:gmatch(pattern) do
+        arg = arg:match('^%s*(.-)%s*$') -- Trim whitespace
+        local name, type_hint
+        --
+        -- Check if the argument is quoted
+        if arg:sub(1,1) == '"' and arg:sub(-1) == '"' then
+            name = arg
+            type_hint = ""
+        else
+            name, type_hint = arg:match("([^:]+):?(%w*)")
+        end
+
         table.insert(args, name)
-        table.insert(types, type_hint or nil) -- Add type hint if available
+        table.insert(types, type_hint ~= "" and type_hint or nil)
     end
 
     return function_name, args, types
@@ -84,13 +96,25 @@ end
 
 local function generate_params(args)
     local params = {}
+
     for i = 1, #args do
         local param
-        if funcy.config.use_arg_names then
-            param = args[i] -- Use argument names
+        local arg = args[i]
+
+        -- Check if arg is a string with quotes
+        local is_quoted_string = type(arg) == "string" and (arg:match('^".*"$') or arg:match("^'.*'$"))
+        -- Check if arg is a number (integer or float)
+        local is_number = type(arg) == "number"
+        -- Check if arg is a string representation of a number
+        local is_number_string = type(arg) == "string" and tonumber(arg) ~= nil
+        local is_primitive = is_quoted_string or is_number or is_number_string
+
+        if is_primitive then
+            param = i <= 26 and string.char(96 + i) or ("arg" .. i)
         else
-            param = i <= 26 and string.char(96 + i) or ("arg" .. i) -- Alphabet fallback
+            param = arg
         end
+
         table.insert(params, param)
     end
 
@@ -130,8 +154,11 @@ function funcy.create_function()
     local line = vim.api.nvim_get_current_line()
     local function_name, args = extract_function_info(line)
     if not function_name then return end
+    -- Try to extract types from the current context
+    local current_line_num = vim.api.nvim_win_get_cursor(0)[1]
+    local types = utility.extract_types(args, current_line_num)
 
-    local function_def = generate_function_definition(function_name, args)
+    local function_def = generate_function_definition(function_name, args, types)
     if not function_def then return end
 
     local insert_line_num = find_insert_position(funcy.config.insert_strategy)
@@ -151,7 +178,10 @@ function funcy.create_functions()
         local line = vim.api.nvim_buf_get_lines(0, i - 1, i, false)[1]
         local function_name, args = extract_function_info(line)
         if function_name and args then
-            local function_def = generate_function_definition(function_name, args)
+            -- Try to extract types from the current context
+            local types = utility.extract_types(args, i)
+
+            local function_def = generate_function_definition(function_name, args, types)
             if function_def then
                 vim.list_extend(function_lines, vim.split(function_def, "\n", true))
                 vim.list_extend(function_lines, { "" }) -- Add a blank line between functions
@@ -187,3 +217,6 @@ vim.api.nvim_set_keymap("v", "<leader>cf", ":CreateFuncs<CR>", { noremap = true,
 -- my_function1(arg1, arg2)
 -- my_function2(arg3, arg4)
 -- my_function3(arg5, arg6)
+-- my_function4(1, 2)
+-- my_function4("hello", "world")
+-- my_function4('hello', 'world')

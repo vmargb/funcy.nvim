@@ -1,27 +1,43 @@
 local templates = require('config.templates')
 local M = {}
 
--- Check if a line is empty
 function M.is_empty_line(line)
     return line:match("^%s*$")
 end
 
+function M.is_type_sensitive(filetype)
+    return templates[filetype].type_sensitive or false
+end
+
+function M.default_type(filetype)
+    return templates[filetype].default_type or false
+end
+
+function M.format_params(args, types, filetype)
+    local requires_types = M.is_type_sensitive(filetype)
+    if not requires_types then
+        return table.concat(args, ", ")
+    end
+
+    local default_type = M.default_type(filetype)
+
+    -- Add types for type-sensitive languages
+    local formatted = {}
+    for i, arg in ipairs(args) do
+        table.insert(formatted, (types and types[i] or default_type) .. " " .. arg)
+    end
+    return table.concat(formatted, ", ")
+end
+
 -- Check if a line contains a function definition based on templates
 function M.is_function_definition(line)
-    -- Retrieve current filetype
     local filetype = vim.api.nvim_buf_get_option(0, "filetype")
-    -- Get the template for the current filetype
-    local template = templates[filetype]
-    if not template then return false end -- Return false if no template is found
+    local template = templates[filetype] or templates.default
+    if not template or not template.header then return false end
 
-    -- Extract the header format from the template
-    local header_format = template.header
-    if not header_format then return false end -- Return false if no header format
-
-    -- Use Lua pattern matching to check if the line starts like a function definition
-    -- Replace '%s' placeholders with Lua patterns for function names/arguments
-    local pattern = header_format:gsub("%%s", "[%w_]+") -- Match valid names for functions or parameters
-    return line:match("^%s*" .. pattern:sub(1, pattern:find("%(") - 1)) ~= nil
+    -- check if the line starts like a function definition
+    local header_format = template.header:gsub("%%s", "([%w_]+)")
+    return line:match("^%s*" .. header_format:sub(1, header_format:find("%(") - 1)) ~= nil
 end
 
 -- Find the nearest empty line before a given line
@@ -32,7 +48,7 @@ function M.find_empty_line_before(line_num)
             return i
         end
     end
-    return nil
+    return 0 -- default to zero if no empty line is found
 end
 
 -- Check if any function definition exists between two lines

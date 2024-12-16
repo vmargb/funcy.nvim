@@ -22,7 +22,7 @@ A snippets plugin for function definitions using plain Lua
 
 ```lua
 use {
-    "username/my-plugin",
+    "vmargb/funcy.nvim",
     config = function()
         require("funcy").setup({
             insert_strategy = "before_cursor",

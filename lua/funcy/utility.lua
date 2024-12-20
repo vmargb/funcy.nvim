@@ -13,29 +13,64 @@ function M.default_type(filetype)
     return templates[filetype].default_type or false
 end
 
-function M.extract_types(args, current_line_num)
-    local types = {}
+function M.extract_types(args, filetype)
+    local requires_types = M.is_type_sensitive(filetype)
+    if not requires_types then return nil end
 
-    -- Look for parameter type annotations in the current function
-    for i = current_line_num, 1, -1 do
-        local line = vim.api.nvim_buf_get_lines(0, i - 1, i, false)[1]
-        -- check if the line has type information
-        for _, arg in ipairs(args) do
-            local type_match = line:match(arg .. "%s*:%s*([%w_]+)")
-            if type_match then
-                types[#types + 1] = type_match
+    local default_type = M.default_type(filetype) or false
+    local types = {}
+    local bufnr = vim.api.nvim_get_current_buf()
+    local current_line = vim.api.nvim_win_get_cursor(0)[1] - 1
+
+    -- get all lines up to the current line (to find variable declarations of arguments)
+    local lines = vim.api.nvim_buf_get_lines(0, 0, current_line + 1, false)
+
+    for _, arg in ipairs(args) do
+        -- search backwards through lines to find the arguments
+        local found = false
+        for i = #lines, 1, -1 do
+            local line = lines[i]
+            local var_start = line:match("^%s*[%w_:]+%s+" .. vim.pesc(arg) .. "%s*[=;]")
+            if var_start then
+                local params = {
+                    textDocument = vim.lsp.util.make_text_document_params(),
+                    position = {
+                        line = i - 1,  -- convert to 0-based line number
+                        character = line:find(arg) - 1  -- convert to 0-based column
+                    }
+                }
+
+                local result = vim.lsp.buf_request_sync(0, 'textDocument/hover', params, 1000)
+                -- find the non-empty result
+                local lsp_result = nil
+                for _, res in pairs(result or {}) do
+                    if res.result then
+                        lsp_result = res.result
+                        break
+                    end
+                end
+
+                -- extract the type information from lsp results
+                if lsp_result and lsp_result.contents and lsp_result.contents.value then
+                    local content = lsp_result.contents.value
+                    local type_match = content:match("Type:%s*`([^`]+)`")
+                    if type_match then
+                        table.insert(types, type_match)
+                        found = true
+                        break
+                    end
+                end
             end
         end
 
-        -- Stop searching once a function definition or block start is found
-        if line:match("^%s*function") or line:match("^%s*%{") then
-            break
+        if not found then
+            table.insert(types, default_type)
         end
     end
 
-    -- Return `nil` if no types were found
     return #types > 0 and types or nil
 end
+
 
 function M.format_params(args, types, filetype)
     local requires_types = M.is_type_sensitive(filetype)
@@ -48,6 +83,7 @@ function M.format_params(args, types, filetype)
     -- Add types for type-sensitive languages
     local formatted = {}
     for i, arg in ipairs(args) do
+        -- TODO: handle cases where types come after the variable
         table.insert(formatted, (types and types[i] or default_type) .. " " .. arg)
     end
     return table.concat(formatted, ", ")

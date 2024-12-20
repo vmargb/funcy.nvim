@@ -1,4 +1,4 @@
-local templates = require('config.templates') -- language templates local utility = require('utility') -- helper functions
+local templates = require('config.templates')
 local utility = require('utility')
 local default_config = require('config.config')
 
@@ -129,12 +129,12 @@ local function generate_function_definition(function_name, args, types)
         return nil
     end
 
-    -- prompt for types
+    -- prompt for types if types are not provided
     if template.type_sensitive and not types then
         types = prompt_for_types(args)
     end
 
-    local params = generate_params(args)
+    local params = generate_params(args) -- param names
 
     local formatted_params = utility.format_params(params, types, filetype)
     local indent = string.rep(" ", vim.api.nvim_buf_get_option(0, "shiftwidth"))
@@ -151,12 +151,13 @@ end
 
 -- Main function to create the function
 function funcy.create_function()
+    local filetype = vim.api.nvim_buf_get_option(0, "filetype")
     local line = vim.api.nvim_get_current_line()
     local function_name, args = extract_function_info(line)
     if not function_name then return end
     -- Try to extract types from the current context
     local current_line_num = vim.api.nvim_win_get_cursor(0)[1]
-    local types = utility.extract_types(args, current_line_num)
+    local types = utility.extract_types(args, filetype)
 
     local function_def = generate_function_definition(function_name, args, types)
     if not function_def then return end
@@ -170,6 +171,7 @@ function funcy.create_function()
 end
 
 function funcy.create_functions()
+    local filetype = vim.api.nvim_buf_get_option(0, "filetype")
     local start_line, end_line = vim.fn.line("'<"), vim.fn.line("'>")
     local insert_line_num = find_insert_position(funcy.config.insert_strategy)
     local function_lines = {}
@@ -179,7 +181,7 @@ function funcy.create_functions()
         local function_name, args = extract_function_info(line)
         if function_name and args then
             -- Try to extract types from the current context
-            local types = utility.extract_types(args, i)
+            local types = utility.extract_types(args, filetype)
 
             local function_def = generate_function_definition(function_name, args, types)
             if function_def then
@@ -216,7 +218,6 @@ vim.api.nvim_set_keymap("v", "<leader>cf", ":CreateFuncs<CR>", { noremap = true,
 -- Example for testing:
 -- my_function1(arg1, arg2)
 -- my_function2(arg3, arg4)
--- my_function3(arg5, arg6)
--- my_function4(1, 2)
+-- my_function3(1, 2)
 -- my_function4("hello", "world")
--- my_function4('hello', 'world')
+-- my_function5('hello', 'world')

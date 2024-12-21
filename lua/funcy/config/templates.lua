@@ -3,18 +3,13 @@ local templates = {
         header = "%s(%s) {\n",
         body = "%s// %s = ...\n",
         footer = "}\n",
-        type_sensitive = false
+        type_sensitive = false,
+        var_patter = "^%s*[%w_:]+%s+"
     },
     lua = {
         header = "function %s(%s)\n",
         body = "%s-- %s = ...\n",
         footer = "end\n",
-        type_sensitive = false
-    },
-    python = {
-        header = "def %s(%s):\n",
-        body = "%s# %s = ...\n",
-        footer = "    pass\n",
         type_sensitive = false
     },
     javascript = {
@@ -23,63 +18,56 @@ local templates = {
         footer = "}\n",
         type_sensitive = false
     },
-    typescript = {
-        header = "function %s(%s): void {\n",
+    cpp = {
+        header = "void %s(%s) {\n",
         body = "%s// %s = ...\n",
         footer = "}\n",
-        type_sensitive = false,
-        default_type = "any"
+        type_sensitive = true,
+        default_type = "void",
+        var_pattern = "^%s*([%w_:]+)%s+([%w_]+)%s*[=;]"
+    },
+    csharp = {
+        header = "public static void %s(%s) {\n",
+        body = "%s// %s = ...\n",
+        footer = "}\n",
+        type_sensitive = true
     },
     java = {
         header = "public static void %s(%s) {\n",
         body = "%s// %s = ...\n",
         footer = "}\n",
         type_sensitive = true,
-        default_type = "Object"
+        default_type = "Object",
+        var_pattern = "^%s*([%w_<>%[%]]+)%s+([%w_]+)%s*[=;]"
     },
-    c = {
-        header = "void %s(%s) {\n",
+    python = {
+        header = "def %s(%s):\n",
+        body = "%s# %s = ...\n",
+        footer = "    pass\n",
+        type_sensitive = false,
+        var_pattern = "^%s*([%w_]+)%s*:%s*([%w_%.]+)"  -- for type hints
+    },
+    typescript = {
+        header = "function %s(%s): void {\n",
         body = "%s// %s = ...\n",
         footer = "}\n",
-        type_sensitive = true,
-        default_type = "void"
-    },
-    cpp = {
-        header = "void %s(%s) {\n",
-        body = "%s// %s = ...\n",
-        footer = "}\n",
-        type_sensitive = true,
-        default_type = "void"
-    },
-    csharp = {  -- C#
-        header = "public static void %s(%s) {\n",
-        body = "%s// %s = ...\n",
-        footer = "}\n",
-        type_sensitive = true
+        type_sensitive = false,
+        default_type = "any",
+        var_pattern = "^%s*(?:let|const|var)%s+([%w_]+)%s*:%s*([%w_<>%[%]]+)"
     },
     go = {
         header = "func %s(%s) {\n",
         body = "%s// %s = ...\n",
         footer = "}\n",
-        type_sensitive = true
-    },
-    ruby = {
-        header = "def %s(%s)\n",
-        body = "%s# %s = ...\n",
-        footer = "end\n",
-        type_sensitive = true
-    },
-    php = {
-        header = "function %s(%s) {\n",
-        body = "%s// %s = ...\n",
-        footer = "}\n",
-        type_sensitive = false
+        type_sensitive = true,
+        var_pattern = "^%s*(?:var%s+)?([%w_]+)%s+([%w_]+)%s*[=:;]"
     },
     rust = {
         header = "fn %s(%s) {\n",
         body = "%s// %s = ...\n",
         footer = "}\n",
-        type_sensitive = true
+        type_sensitive = true,
+        var_pattern = "^%s*let%s+(?:mut%s+)?([%w_]+)%s*:%s*([%w_<>]+)"
     },
     swift = {
         header = "func %s(%s) {\n",
@@ -98,7 +86,7 @@ local templates = {
         body = "%s// %s = ...\n",
         footer = "}\n",
         type_sensitive = true
-    }
+    },
 }
 
 return templates

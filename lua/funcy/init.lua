@@ -1,6 +1,7 @@
 local templates = require('config.templates')
 local utility = require('utility')
 local default_config = require('config.config')
+local parser = require('function_parser')
 
 local funcy = {
     config = default_config,
@@ -11,45 +12,7 @@ function funcy.setup(user_config)
     funcy.config = vim.tbl_extend("force", funcy.config, user_config or {})
 end
 
-local function prompt_for_types(args)
-    local types = {}
-    for _, arg in ipairs(args) do
-        local input_type = vim.fn.input("Type for " .. arg .. ": ")
-        table.insert(types, input_type)
-    end
-    return types
-end
-
-local function extract_function_info(line)
-    local function_name, args_str = line:match("([%w_]+)%s*%((.*)%)")
-    if not function_name or not args_str then
-        print("Invalid function call format.")
-        return nil, nil
-    end
-
-    local args, types = {}, {}
-    local pattern = '[^,]+' -- Default pattern for non-quoted arguments
-
-    for arg in args_str:gmatch(pattern) do
-        arg = arg:match('^%s*(.-)%s*$') -- Trim whitespace
-        local name, type_hint
-        --
-        -- Check if the argument is quoted
-        if arg:sub(1,1) == '"' and arg:sub(-1) == '"' then
-            name = arg
-            type_hint = ""
-        else
-            name, type_hint = arg:match("([^:]+):?(%w*)")
-        end
-
-        table.insert(args, name)
-        table.insert(types, type_hint ~= "" and type_hint or nil)
-    end
-
-    return function_name, args, types
-end
-
--- Function to determine where to insert the function definition
+-- where to insert the function definition
 local function find_insert_position(strategy)
     local current_line_num = vim.api.nvim_win_get_cursor(0)[1]
     -- this line is to get the number of lines in the buffer
@@ -131,7 +94,7 @@ local function generate_function_definition(function_name, args, types)
 
     -- prompt for types if types are not provided
     if template.type_sensitive and not types then
-        types = prompt_for_types(args)
+        types = parser.prompt_for_types(args)
     end
 
     local params = generate_params(args) -- param names
@@ -153,11 +116,11 @@ end
 function funcy.create_function()
     local filetype = vim.api.nvim_buf_get_option(0, "filetype")
     local line = vim.api.nvim_get_current_line()
-    local function_name, args = extract_function_info(line)
+    local function_name, args = parser.extract_function_info(line)
     if not function_name then return end
     -- Try to extract types from the current context
     local current_line_num = vim.api.nvim_win_get_cursor(0)[1]
-    local types = utility.extract_types(args, filetype)
+    local types = parser.extract_arg_types(args, filetype)
 
     local function_def = generate_function_definition(function_name, args, types)
     if not function_def then return end
@@ -178,10 +141,10 @@ function funcy.create_functions()
 
     for i = start_line, end_line do
         local line = vim.api.nvim_buf_get_lines(0, i - 1, i, false)[1]
-        local function_name, args = extract_function_info(line)
+        local function_name, args = parser.extract_function_info(line)
         if function_name and args then
             -- Try to extract types from the current context
-            local types = utility.extract_types(args, filetype)
+            local types = parser.extract_arg_types(args, filetype)
 
             local function_def = generate_function_definition(function_name, args, types)
             if function_def then

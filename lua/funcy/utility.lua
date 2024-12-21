@@ -13,6 +13,10 @@ function M.default_type(filetype)
     return templates[filetype].default_type or false
 end
 
+function M.var_pattern(filetype)
+    return templates[filetype].var_pattern or false
+end
+
 function M.extract_types(args, filetype)
     local requires_types = M.is_type_sensitive(filetype)
     if not requires_types then return nil end

@@ -1,34 +1,44 @@
 # funcy.nvim
 > [!WARNING]
-> This plugin is in early alpha stage and is not ready for use.
+> This plugin is in early development stage and is not ready for use.
 
-A snippets plugin for function definitions using plain Lua
+A snippets plugin for function definitions using plain Lua and LSP.
 
-## Installation
+## 📦 Installation
 
-## Lazy
+### Lazy
 ```lua
 {
     "vmargb/funcy.nvim",
+    lazy = true,
     config = function()
-        require("funcy").setup({
-            insert_strategy = "before_cursor",
-        })
-    end
+        require("funcy").setup()
+    end,
+    dependencies = { "neovim/nvim-lspconfig" }
 }
 ```
 
-## Packer
+### Packer
 
 ```lua
 use {
     "vmargb/funcy.nvim",
     config = function()
-        require("funcy").setup({
-            insert_strategy = "before_cursor",
-        })
-    end
+        require("funcy").setup()
+    end,
+    dependencies = { "neovim/nvim-lspconfig" }
 }
 ```
 
-## Setup
+## Usage
+### Commands
+
+## Configuration
+### Default Options
+
+```lua
+require("your-plugin-name").setup({
+  insert_strategy = "before_cursor",
+  use_arg_names = true,
+})
+

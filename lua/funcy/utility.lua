@@ -9,6 +9,10 @@ function M.is_type_sensitive(filetype)
     return templates[filetype].type_sensitive or false
 end
 
+function M.template(filetype)
+    return templates[filetype] or templates.default
+end
+
 function M.default_type(filetype)
     return templates[filetype].default_type or false
 end
@@ -16,65 +20,6 @@ end
 function M.var_pattern(filetype)
     return templates[filetype].var_pattern or false
 end
-
-function M.extract_types(args, filetype)
-    local requires_types = M.is_type_sensitive(filetype)
-    if not requires_types then return nil end
-
-    local default_type = M.default_type(filetype) or false
-    local types = {}
-    local bufnr = vim.api.nvim_get_current_buf()
-    local current_line = vim.api.nvim_win_get_cursor(0)[1] - 1
-
-    -- get all lines up to the current line (to find variable declarations of arguments)
-    local lines = vim.api.nvim_buf_get_lines(0, 0, current_line + 1, false)
-
-    for _, arg in ipairs(args) do
-        -- search backwards through lines to find the arguments
-        local found = false
-        for i = #lines, 1, -1 do
-            local line = lines[i]
-            local var_start = line:match("^%s*[%w_:]+%s+" .. vim.pesc(arg) .. "%s*[=;]")
-            if var_start then
-                local params = {
-                    textDocument = vim.lsp.util.make_text_document_params(),
-                    position = {
-                        line = i - 1,  -- convert to 0-based line number
-                        character = line:find(arg) - 1  -- convert to 0-based column
-                    }
-                }
-
-                local result = vim.lsp.buf_request_sync(0, 'textDocument/hover', params, 1000)
-                -- find the non-empty result
-                local lsp_result = nil
-                for _, res in pairs(result or {}) do
-                    if res.result then
-                        lsp_result = res.result
-                        break
-                    end
-                end
-
-                -- extract the type information from lsp results
-                if lsp_result and lsp_result.contents and lsp_result.contents.value then
-                    local content = lsp_result.contents.value
-                    local type_match = content:match("Type:%s*`([^`]+)`")
-                    if type_match then
-                        table.insert(types, type_match)
-                        found = true
-                        break
-                    end
-                end
-            end
-        end
-
-        if not found then
-            table.insert(types, default_type)
-        end
-    end
-
-    return #types > 0 and types or nil
-end
-
 
 function M.format_params(args, types, filetype)
     local requires_types = M.is_type_sensitive(filetype)
@@ -88,9 +33,30 @@ function M.format_params(args, types, filetype)
     local formatted = {}
     for i, arg in ipairs(args) do
         -- TODO: handle cases where types come after the variable
+        -- perhaps ask for a user prompt each time a type isn't
+        -- available in types[i]
         table.insert(formatted, (types and types[i] or default_type) .. " " .. arg)
     end
     return table.concat(formatted, ", ")
+end
+
+function M.format_header(function_name, args, types, return_type, filetype)
+    local template = templates[filetype] or templates.default
+    local return_type_pos = template.type_pos
+
+    local formatted_params = M.format_params(args, types, filetype)
+    local header = ""
+
+    if return_type_pos == "start" then
+        header = string.format(template.header, return_type, function_name, formatted_params)
+    elseif return_type_pos == "middle" then
+        header = string.format(template.header, function_name, formatted_params, return_type)
+    elseif return_type_pos == "end" then
+        -- Handle cases where return type is at the end (e.g., Python type hints)
+        header = string.format(template.header, function_name, formatted_params, return_type)
+    end
+
+    return header
 end
 
 -- Check if a line contains a function definition based on templates

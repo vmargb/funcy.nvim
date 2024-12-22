@@ -37,7 +37,7 @@ use {
 ### Default Options
 
 ```lua
-require("your-plugin-name").setup({
+require("vmargb/funcy.nvim").setup({
   insert_strategy = "before_cursor",
   use_arg_names = true,
 })

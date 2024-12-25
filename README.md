@@ -1,12 +1,12 @@
 # funcy.nvim
 > [!WARNING]
-> This plugin is in early development stage and is not ready for use.
+> This plugin is in early development and may be subject to breaking changes.
 
-A snippets plugin for function definitions using plain Lua and LSP.
+A snippets plugin for function definitions using Regex and LSP.
 
 ## 📦 Installation
 
-### Lazy
+### [Lazy](https://github.com/folke/lazy.nvim)
 ```lua
 {
     "vmargb/funcy.nvim",
@@ -18,8 +18,7 @@ A snippets plugin for function definitions using plain Lua and LSP.
 }
 ```
 
-### Packer
-
+### [Packer](https://github.com/wbthomason/packer.nvim)
 ```lua
 use {
     "vmargb/funcy.nvim",
@@ -32,6 +31,8 @@ use {
 
 ## Usage
 ### Commands
+`<leader>cf` - Create function
+`visual+<leader>cf` - Create multiple functions with visual mode
 
 ## Configuration
 ### Default Options

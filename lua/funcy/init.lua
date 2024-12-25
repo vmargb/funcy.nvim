@@ -169,7 +169,6 @@ vim.api.nvim_create_user_command("SetCallStrategy", function(opts)
 end, { nargs = 1 })
 
 vim.api.nvim_create_user_command("CreateFunc", function()
-    print(1)
     funcy.create_function()
 end, { nargs = 0 })
 

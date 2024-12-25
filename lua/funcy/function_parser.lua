@@ -2,15 +2,6 @@ local util = require('utility')
 
 local M = {}
 
-function M.prompt_for_types(args)
-    local types = {}
-    for _, arg in ipairs(args) do
-        local input_type = vim.fn.input("Type for " .. arg .. ": ")
-        table.insert(types, input_type)
-    end
-    return types
-end
-
 -- neovim async calls functions ahead of time!
 function M.extract_function_info(line)
     local function_name, args_str = line:match("([%w_%.]+)%s*%((.-)%)")
@@ -41,16 +32,7 @@ function M.extract_function_info(line)
     return function_name, args, types
 end
 
-function M.extract_return_type(line, filetype)
-    local requires_types = util.is_type_sensitive(filetype)
-    if not requires_types then return nil end
-    local current_line = vim.api.nvim_win_get_cursor(0)[1] - 1
-
-    local type, var_name = line:match(util.var_pattern(filetype))
-    if type == "" then type = nil end
-    if type then return type end
-    if not var_name then return nil end
-
+local function get_type(current_line, line, var_name)
     local params = {
         textDocument = vim.lsp.util.make_text_document_params(),
         position = {
@@ -60,71 +42,55 @@ function M.extract_return_type(line, filetype)
     }
 
     local result = vim.lsp.buf_request_sync(0, 'textDocument/hover', params, 1000)
+    if not result then return nil end
 
-    local lsp_result = nil
-    for _, res in pairs(result or {}) do
-        if res.result then
-            lsp_result = res.result
-            break
-        end
-    end
-
-    if lsp_result and lsp_result.contents and lsp_result.contents.value then
-        local content = lsp_result.contents.value
-        local type_match = content:match("Type:%s*`([^`]+)`")
-        if type_match then
-            return type_match
+    for _, res in pairs(result) do
+        if res.result and res.result.contents and res.result.contents.value then
+            return res.result.contents.value:match("Type:%s*`([^`]+)`")
         end
     end
 
     return nil
 end
 
-function M.extract_arg_types(args, filetype)
-    local requires_types = util.is_type_sensitive(filetype)
-    if not requires_types then return nil end
+function M.extract_return_type(line, filetype)
+    if not util.is_type_sensitive(filetype) then return nil end
 
-    local default_type = util.default_type(filetype) or false
-    local types = {}
+    local current_line = vim.api.nvim_win_get_cursor(0)[1] - 1
+    local type, var_name = line:match(util.var_pattern(filetype))
+    if type and type ~= "" then return type end
+    if not var_name then return nil end
+
+    -- fallback to lsp if type isn't found
+    return get_type(current_line, line, var_name)
+end
+
+function M.extract_arg_types(args, filetype)
+    if not util.is_type_sensitive(filetype) then return nil end
+
+    local default_type = util.default_arg_type(filetype)
     local bufnr = vim.api.nvim_get_current_buf()
     local current_line = vim.api.nvim_win_get_cursor(0)[1] - 1
     local save_cursor = vim.fn.getcurpos()
+    local types = {}
 
     for _, arg in ipairs(args) do
         local found = false
         local search_result = vim.fn.search("\\<" .. vim.fn.escape(arg, "\\") .. "\\>", "bnw")
 
+        -- search result for each arg
         while search_result ~= 0 and search_result <= current_line + 1 do
             local line = vim.api.nvim_buf_get_lines(0, search_result - 1, search_result, false)[1]
-            local var_start = line:match("^%s*[%w_:]+%s+" .. vim.pesc(arg) .. "%s*[=;]")
+            local var_match = line:match("^%s*[%w_:]+%s+" .. vim.pesc(arg) .. "%s*[=;]")
 
-            if var_start then
-                local params = {
-                    textDocument = vim.lsp.util.make_text_document_params(),
-                    position = {
-                        line = search_result - 1,
-                        character = line:find(arg) - 1
-                    }
-                }
-
-                local result = vim.lsp.buf_request_sync(0, 'textDocument/hover', params, 1000)
-                local lsp_result = nil
-                for _, res in pairs(result or {}) do
-                    if res.result then
-                        lsp_result = res.result
-                        break
-                    end
+            if var_match then
+                local type = get_type(search_result - 1, line, arg)
+                if type then
+                    table.insert(types, type)
+                    found = true
+                    break
                 end
 
-                if lsp_result and lsp_result.contents and lsp_result.contents.value then
-                    local content = lsp_result.contents.value
-                    local type_match = content:match("Type:%s*`([^`]+)`")
-                    if type_match then
-                        table.insert(types, type_match)
-                        found = true
-                        break
-                    end
-                end
             end
 
             -- move cursor to just before the current match to avoid infinite loop!
@@ -132,10 +98,16 @@ function M.extract_arg_types(args, filetype)
             search_result = vim.fn.search("\\<" .. vim.fn.escape(arg, "\\") .. "\\>", "bnw")
         end
 
-        if not found and default_type then
-            table.insert(types, default_type)
+        if not found then
+            if default_type then
+                table.insert(types, default_type)
+            else
+                table.insert(types, vim.fn.input("Type for " .. arg .. ": "))
+            end
         end
     end
+
+    print("final types:", types[1], types[2])
 
     -- Restore cursor position after processing
     vim.fn.setpos('.', save_cursor)

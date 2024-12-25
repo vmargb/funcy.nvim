@@ -17,42 +17,49 @@ function M.default_type(filetype)
     return templates[filetype].default_type or false
 end
 
+function M.default_arg_type(filetype)
+    return templates[filetype].default_arg_type or false
+end
+
 function M.var_pattern(filetype)
     return templates[filetype].var_pattern or false
 end
 
-function M.format_params(args, types, filetype)
+function M.format_params(args, types, filetype, type_pos)
     local requires_types = M.is_type_sensitive(filetype)
     if not requires_types then
         return table.concat(args, ", ")
     end
 
-    local default_type = M.default_type(filetype)
+    local separator = M.template(filetype).type_separator or " " -- Default to `:` for most languages
 
-    -- Add types for type-sensitive languages
     local formatted = {}
     for i, arg in ipairs(args) do
-        -- TODO: handle cases where types come after the variable
-        -- perhaps ask for a user prompt each time a type isn't
-        -- available in types[i]
-        table.insert(formatted, (types and types[i] or default_type) .. " " .. arg)
+        if types and types[i] then
+            if type_pos == "start" then
+                table.insert(formatted, types[i] .. " " .. arg)
+            elseif type_pos == "end" then
+                table.insert(formatted, arg .. separator .. types[i])
+            end
+        else
+            -- If no type is provided, just use the argument name
+            table.insert(formatted, arg)
+        end
     end
+
     return table.concat(formatted, ", ")
 end
 
 function M.format_header(function_name, args, types, return_type, filetype)
     local template = templates[filetype] or templates.default
-    local return_type_pos = template.type_pos
+    local type_pos = template.type_pos
 
-    local formatted_params = M.format_params(args, types, filetype)
+    local formatted_params = M.format_params(args, types, filetype, type_pos)
     local header = ""
 
-    if return_type_pos == "start" then
+    if type_pos == "start" then
         header = string.format(template.header, return_type, function_name, formatted_params)
-    elseif return_type_pos == "middle" then
-        header = string.format(template.header, function_name, formatted_params, return_type)
-    elseif return_type_pos == "end" then
-        -- Handle cases where return type is at the end (e.g., Python type hints)
+    elseif type_pos == "end" then
         header = string.format(template.header, function_name, formatted_params, return_type)
     end
 

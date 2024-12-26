@@ -54,33 +54,6 @@ local function find_insert_position(strategy)
     return buffer_len
 end
 
-local function generate_params(args)
-    local params = {}
-
-    for i = 1, #args do
-        local param
-        local arg = args[i]
-
-        -- Check if arg is a string with quotes
-        local is_quoted_string = type(arg) == "string" and (arg:match('^".*"$') or arg:match("^'.*'$"))
-        -- Check if arg is a number (integer or float)
-        local is_number = type(arg) == "number"
-        -- Check if arg is a string representation of a number
-        local is_number_string = type(arg) == "string" and tonumber(arg) ~= nil
-        local is_primitive = is_quoted_string or is_number or is_number_string
-
-        if is_primitive then
-            param = i <= 26 and string.char(96 + i) or ("arg" .. i)
-        else
-            param = arg
-        end
-
-        table.insert(params, param)
-    end
-
-    return params
-end
-
 local function generate_function_definition(function_name, args, line)
     local filetype = vim.api.nvim_buf_get_option(0, "filetype")
     local template = utility.template(filetype)
@@ -104,7 +77,7 @@ local function generate_function_definition(function_name, args, line)
         end
     end
 
-    local params = generate_params(args) -- param names
+    local params = parser.generate_params(args) -- param names
 
     local indent = string.rep(" ", vim.api.nvim_buf_get_option(0, "shiftwidth"))
     -- format template header to include function name, params and return type

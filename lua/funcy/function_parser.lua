@@ -31,6 +31,34 @@ function M.extract_function_info(line)
     return function_name, args, types
 end
 
+function M.generate_params(args)
+    local params = {}
+
+    for i = 1, #args do
+        local param
+        local arg = args[i]
+
+        -- Check if arg is a string with quotes
+        local is_quoted_string = type(arg) == "string" and (arg:match('^".*"$') or arg:match("^'.*'$"))
+        -- Check if arg is a number (integer or float)
+        local is_number = type(arg) == "number"
+        -- Check if arg is a string representation of a number
+        local is_number_string = type(arg) == "string" and tonumber(arg) ~= nil
+        local is_primitive = is_quoted_string or is_number or is_number_string
+
+        if is_primitive then
+            param = i <= 26 and string.char(96 + i) or ("arg" .. i)
+        else
+            param = arg
+        end
+
+        table.insert(params, param)
+    end
+
+    return params
+end
+
+-- line number, line contents, arg
 local function get_type(current_line, line, var_name)
     local params = {
         textDocument = vim.lsp.util.make_text_document_params(),
@@ -64,6 +92,18 @@ function M.extract_return_type(line, filetype)
     return get_type(current_line, line, var_name)
 end
 
+local function search(arg, start_line)
+    -- search backward
+    vim.fn.cursor(start_line, 1)
+    local backward_result = vim.fn.search("\\<" .. vim.fn.escape(arg, "\\") .. "\\>", "bnW")
+    if backward_result ~= 0 then
+        return backward_result
+    end
+    -- search forward
+    vim.fn.cursor(start_line, 1)
+    return vim.fn.search("\\<" .. vim.fn.escape(arg, "\\") .. "\\>", "nW")
+end
+
 function M.extract_arg_types(args, filetype)
     if not util.is_type_sensitive(filetype) then return nil end
 
@@ -74,14 +114,12 @@ function M.extract_arg_types(args, filetype)
     local types = {}
 
     local counter = 0
-    local max_iterations = 1000
+    local max_iterations = 100
 
     for _, arg in ipairs(args) do
         local found = false
-        -- reset to the start line for the search of each arg
-        vim.fn.cursor(current_line, 1)
         local initial_pos = vim.fn.getcurpos() -- initial cursor position at the start of our search
-        local search_result = vim.fn.search("\\<" .. vim.fn.escape(arg, "\\") .. "\\>", "bnw")
+        local search_result = search(arg, current_line-1)
 
         -- search result for current arg
         while search_result ~= 0 and search_result <= current_line + 1 and counter < max_iterations do
@@ -101,7 +139,7 @@ function M.extract_arg_types(args, filetype)
                 break
             end
             --initial_pos = new_pos
-            search_result = vim.fn.search("\\<" .. vim.fn.escape(arg, "\\") .. "\\>", "bnw")
+            search_result = search(arg, current_line-1)
             counter = counter + 1
         end
 

@@ -62,7 +62,8 @@ local function generate_function_definition(function_name, args, line)
         return nil
     end
 
-    local types = parser.extract_arg_types(args, filetype) -- here
+    local params, known_types = parser.generate_params(args) -- param names
+    local types = parser.extract_arg_types(args, filetype, known_types) -- here
     local return_type = parser.extract_return_type(line, filetype)
 
     -- prompt for types if no types
@@ -76,8 +77,6 @@ local function generate_function_definition(function_name, args, line)
             return_type = template.default_type
         end
     end
-
-    local params = parser.generate_params(args) -- param names
 
     local indent = string.rep(" ", vim.api.nvim_buf_get_option(0, "shiftwidth"))
     -- format template header to include function name, params and return type

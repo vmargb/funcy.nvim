@@ -2,6 +2,15 @@ local util = require('utility')
 
 local M = {}
 
+function M.prompt_for_types(args)
+    local types = {}
+    for _, arg in ipairs(args) do
+        local input_type = vim.fn.input("Type for " .. arg .. ": ")
+        table.insert(types, input_type)
+    end
+    return types
+end
+
 function M.extract_function_info(line)
     local function_name, args_str = line:match("([%w_%.]+)%s*%((.-)%)")
     if not function_name then
@@ -33,6 +42,7 @@ end
 
 function M.generate_params(args)
     local params = {}
+    local types = {}
 
     for i = 1, #args do
         local param
@@ -48,6 +58,18 @@ function M.generate_params(args)
 
         if is_primitive then
             param = i <= 26 and string.char(96 + i) or ("arg" .. i)
+            -- Assign the type based on the primitive
+            if is_quoted_string then
+                types[i] = "string"
+            elseif is_number or is_number_string then
+                -- Determine if it's an integer or float
+                local num = tonumber(arg)
+                if num and math.floor(num) == num then
+                    types[i] = "int"
+                else
+                    types[i] = "float"
+                end
+            end
         else
             param = arg
         end
@@ -55,7 +77,7 @@ function M.generate_params(args)
         table.insert(params, param)
     end
 
-    return params
+    return params, types
 end
 
 -- line number, line contents, arg
@@ -104,19 +126,19 @@ local function search(arg, start_line)
     return vim.fn.search("\\<" .. vim.fn.escape(arg, "\\") .. "\\>", "nW")
 end
 
-function M.extract_arg_types(args, filetype)
+function M.extract_arg_types(args, filetype, known_types)
     if not util.is_type_sensitive(filetype) then return nil end
 
     local default_type = util.default_arg_type(filetype)
     local bufnr = vim.api.nvim_get_current_buf()
     local current_line = vim.api.nvim_win_get_cursor(0)[1] - 1
     local save_cursor = vim.fn.getcurpos()
-    local types = {}
-
+    local types = known_types or {}
     local counter = 0
     local max_iterations = 100
 
-    for _, arg in ipairs(args) do
+    for i, arg in ipairs(args) do
+        if types[i] then goto continue end
         local found = false
         local initial_pos = vim.fn.getcurpos() -- initial cursor position at the start of our search
         local search_result = search(arg, current_line-1)
@@ -126,7 +148,7 @@ function M.extract_arg_types(args, filetype)
             local line = vim.api.nvim_buf_get_lines(0, search_result - 1, search_result, false)[1]
             local type = get_type(search_result - 1, line, arg)
             if type then
-                table.insert(types, type)
+                types[i] = type
                 found = true
                 break
             end
@@ -145,11 +167,12 @@ function M.extract_arg_types(args, filetype)
 
         if not found then
             if default_type then
-                table.insert(types, default_type)
+                types[i] = default_type
             else
-                table.insert(types, vim.fn.input("Type for " .. arg .. ": "))
+                types[i] = vim.fn.input("Type for " .. arg .. ": ")
             end
         end
+        ::continue::
     end
 
     -- Restore cursor position after processing

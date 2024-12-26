@@ -2,7 +2,6 @@ local util = require('utility')
 
 local M = {}
 
--- neovim async calls functions ahead of time!
 function M.extract_function_info(line)
     local function_name, args_str = line:match("([%w_%.]+)%s*%((.-)%)")
     if not function_name then
@@ -11,12 +10,12 @@ function M.extract_function_info(line)
     end
 
     local args, types = {}, {}
-    local pattern = '[^,]+' -- Default pattern for non-quoted arguments
+    local pattern = '[^,]+' -- non-quoted arguments
 
     for arg in args_str:gmatch(pattern) do
-        arg = arg:match('^%s*(.-)%s*$') -- Trim whitespace
+        arg = arg:match('^%s*(.-)%s*$') -- trim whitespace
         local name, type_hint
-        --
+
         -- Check if the argument is quoted
         if arg:sub(1,1) == '"' and arg:sub(-1) == '"' then
             name = arg
@@ -74,28 +73,36 @@ function M.extract_arg_types(args, filetype)
     local save_cursor = vim.fn.getcurpos()
     local types = {}
 
+    local counter = 0
+    local max_iterations = 1000
+
     for _, arg in ipairs(args) do
         local found = false
+        -- reset to the start line for the search of each arg
+        vim.fn.cursor(current_line, 1)
+        local initial_pos = vim.fn.getcurpos() -- initial cursor position at the start of our search
         local search_result = vim.fn.search("\\<" .. vim.fn.escape(arg, "\\") .. "\\>", "bnw")
 
-        -- search result for each arg
-        while search_result ~= 0 and search_result <= current_line + 1 do
+        -- search result for current arg
+        while search_result ~= 0 and search_result <= current_line + 1 and counter < max_iterations do
             local line = vim.api.nvim_buf_get_lines(0, search_result - 1, search_result, false)[1]
-            local var_match = line:match("^%s*[%w_:]+%s+" .. vim.pesc(arg) .. "%s*[=;]")
-
-            if var_match then
-                local type = get_type(search_result - 1, line, arg)
-                if type then
-                    table.insert(types, type)
-                    found = true
-                    break
-                end
-
+            local type = get_type(search_result - 1, line, arg)
+            if type then
+                table.insert(types, type)
+                found = true
+                break
             end
-
-            -- move cursor to just before the current match to avoid infinite loop!
+            -- move cursor to just before the current match to avoid
+            -- getting mixed up with repeated matches in different functions
             vim.fn.cursor(search_result - 1, 1)
+            local new_pos = vim.fn.getcurpos()
+            -- if the cursor returns to the same position (infinite loop) there's no match
+            if vim.deep_equal(new_pos, initial_pos) then
+                break
+            end
+            --initial_pos = new_pos
             search_result = vim.fn.search("\\<" .. vim.fn.escape(arg, "\\") .. "\\>", "bnw")
+            counter = counter + 1
         end
 
         if not found then
@@ -106,8 +113,6 @@ function M.extract_arg_types(args, filetype)
             end
         end
     end
-
-    print("final types:", types[1], types[2])
 
     -- Restore cursor position after processing
     vim.fn.setpos('.', save_cursor)

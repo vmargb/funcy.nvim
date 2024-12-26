@@ -11,23 +11,21 @@ function funcy.setup(user_config)
     funcy.config = vim.tbl_extend("force", funcy.config, user_config or {})
 end
 
--- where to insert the function definition
+-- where to insert the generated function
 local function find_insert_position(strategy)
     local current_line_num = vim.api.nvim_win_get_cursor(0)[1]
-    -- this line is to get the number of lines in the buffer
     local buffer_len = vim.api.nvim_buf_line_count(0)
     local insert_line_num = buffer_len -- Default to end of file
 
     if strategy == "before_cursor" then
-        -- Find an empty line before the current line
         local empty_line = utility.find_empty_line_before(current_line_num)
         if empty_line and not utility.has_function_between(empty_line, current_line_num - 1) then
             return empty_line
         end
-        -- Fallback to the current cursor position if no suitable empty line is found
+        -- default to cursor position if nothing is found
         return current_line_num
     elseif strategy == "in_scope" then
-        -- Find the start and end of the current scope
+        -- find the start and end of the current scope
         local scope_start, scope_end = nil, nil
         for i = current_line_num, 1, -1 do
             local line = vim.api.nvim_buf_get_lines(0, i - 1, i, false)[1]
@@ -91,12 +89,12 @@ local function generate_function_definition(function_name, args, line)
         return nil
     end
 
-    local types = parser.extract_arg_types(args, filetype)
+    local types = parser.extract_arg_types(args, filetype) -- here
     local return_type = parser.extract_return_type(line, filetype)
 
     -- prompt for types if no types
     if template.type_sensitive then
-        if not types then
+        if not types and #args > 0 then
             types = parser.prompt_for_types(args)
         end
         -- prompt for return type if no return types
@@ -112,7 +110,7 @@ local function generate_function_definition(function_name, args, line)
     -- format template header to include function name, params and return type
     local function_def = utility.format_header(function_name, params, types, return_type, filetype)
 
-    -- Generate function body
+    -- add body to header
     for _, arg in ipairs(args) do
         function_def = function_def .. string.format(template.body, indent, arg)
     end
@@ -122,45 +120,39 @@ local function generate_function_definition(function_name, args, line)
 end
 
 -- Main function to create the function
-function funcy.create_function()
+function funcy.create_function(mode)
     local filetype = vim.api.nvim_buf_get_option(0, "filetype")
-    local line = vim.api.nvim_get_current_line()
-    local insert_line_num = find_insert_position(funcy.config.insert_strategy)
-    local function_name, args = parser.extract_function_info(line)
-    if not function_name then return end
-    local function_def = generate_function_definition(function_name, args, line)
-    if not function_def then return end
-
-    local function_lines = vim.split(function_def, "\n", true)
-
-    vim.api.nvim_buf_set_lines(0, insert_line_num, insert_line_num, false, function_lines)
-    vim.api.nvim_win_set_cursor(0, { insert_line_num + 1, 0 }) -- set the cursor to the first def
-end
-
-function funcy.create_functions()
-    local filetype = vim.api.nvim_buf_get_option(0, "filetype")
-    local start_line, end_line = vim.fn.line("'<"), vim.fn.line("'>")
-    --print("Start Line:", start_line, "End Line:", end_line)
     local insert_line_num = find_insert_position(funcy.config.insert_strategy)
     local function_lines = {}
 
-    for i = start_line, end_line do
-        local line = vim.api.nvim_buf_get_lines(0, i - 1, i, false)[1]
-        --print("Line", i, ":", line)
+    if mode == "visual" then
+        local start_line, end_line = vim.fn.line("'<"), vim.fn.line("'>")
+        for i = start_line, end_line do
+            local line = vim.api.nvim_buf_get_lines(0, i - 1, i, false)[1]
+            local function_name, args = parser.extract_function_info(line)
+            if function_name then
+                local function_def = generate_function_definition(function_name, args, line)
+                if function_def then
+                    vim.list_extend(function_lines, vim.split(function_def, "\n", true))
+                    vim.list_extend(function_lines, { "" }) -- Add a blank line between functions
+                end
+            end
+        end
+    else
+        local line = vim.api.nvim_get_current_line()
         local function_name, args = parser.extract_function_info(line)
         if not function_name then return end
         local function_def = generate_function_definition(function_name, args, line)
         if function_def then
-            vim.list_extend(function_lines, vim.split(function_def, "\n", true))
-            vim.list_extend(function_lines, { "" }) -- Add a blank line between functions
+            function_lines = vim.split(function_def, "\n", true)
         end
     end
 
     if #function_lines > 0 then
         vim.api.nvim_buf_set_lines(0, insert_line_num, insert_line_num, false, function_lines)
-        vim.api.nvim_win_set_cursor(0, { insert_line_num + 1, 0 })
+        vim.api.nvim_win_set_cursor(0, { insert_line_num + 1, 0 }) -- Set cursor to the first line of the inserted function
     else
-        print("No valid function calls found in the selected lines.")
+        print("No valid function calls found.")
     end
 end
 
@@ -169,11 +161,11 @@ vim.api.nvim_create_user_command("SetCallStrategy", function(opts)
 end, { nargs = 1 })
 
 vim.api.nvim_create_user_command("CreateFunc", function()
-    funcy.create_function()
+    funcy.create_function("normal")
 end, { nargs = 0 })
 
 vim.api.nvim_create_user_command("CreateFuncs", function()
-    funcy.create_functions()
+    funcy.create_function("visual")
 end, { nargs = 0, range = true })
 
 -- mappings

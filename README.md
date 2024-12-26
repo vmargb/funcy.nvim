@@ -29,17 +29,17 @@ use {
 }
 ```
 
-## Usage
-### Commands
-`<leader>cf` - Create function
-`visual+<leader>cf` - Create multiple functions with visual mode
-
-## Configuration
+## ⚙️ Configuration
 ### Default Options
-
 ```lua
 require("vmargb/funcy.nvim").setup({
   insert_strategy = "before_cursor",
   use_arg_names = true,
+  prompt_for_types = true,
 })
+```
+
+## 🚀 Usage
+- `<leader>cf`: Create function
+- `visual+<leader>cf`: Create functions with visual mode
 

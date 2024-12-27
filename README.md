@@ -11,10 +11,10 @@ A snippets plugin for function definitions using Regex and LSP.
 {
     "vmargb/funcy.nvim",
     lazy = true,
+    dependencies = { "neovim/nvim-lspconfig" },
     config = function()
         require("funcy").setup()
     end,
-    dependencies = { "neovim/nvim-lspconfig" }
 }
 ```
 
@@ -22,15 +22,14 @@ A snippets plugin for function definitions using Regex and LSP.
 ```lua
 use {
     "vmargb/funcy.nvim",
+    dependencies = { "neovim/nvim-lspconfig" },
     config = function()
         require("funcy").setup()
     end,
-    dependencies = { "neovim/nvim-lspconfig" }
 }
 ```
 
 ## ⚙️ Configuration
-### Default Options
 ```lua
 require("vmargb/funcy.nvim").setup({
   insert_strategy = "before_cursor",
@@ -42,4 +41,3 @@ require("vmargb/funcy.nvim").setup({
 ## 🚀 Usage
 - `<leader>cf`: Create function
 - `visual+<leader>cf`: Create functions with visual mode
-

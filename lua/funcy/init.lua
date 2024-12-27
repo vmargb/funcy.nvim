@@ -101,6 +101,7 @@ function funcy.create_function(mode)
         local start_line, end_line = vim.fn.line("'<"), vim.fn.line("'>")
         for i = start_line, end_line do
             local line = vim.api.nvim_buf_get_lines(0, i - 1, i, false)[1]
+            vim.api.nvim_win_set_cursor(0, { i, 0 }) -- Explicitly set cursor to this line for LSP to work
             local function_name, args = parser.extract_function_info(line)
             if function_name then
                 local function_def = generate_function_definition(function_name, args, line)

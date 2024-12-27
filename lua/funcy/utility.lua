@@ -1,4 +1,5 @@
 local templates = require('config.templates')
+
 local M = {}
 
 function M.is_empty_line(line)

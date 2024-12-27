@@ -13,6 +13,11 @@ end
 
 function M.extract_function_info(line)
     local function_name, args_str = line:match("([%w_%.]+)%s*%((.-)%)")
+    if not function_name then -- multiline support
+        local next_line = vim.api.nvim_buf_get_lines(0, vim.fn.line('.') - 1, vim.fn.line('.'), false)[1]
+        function_name, args_str = (line .. next_line):match("([%w_%.]+)%s*%((.-)%)")
+    end
+
     if not function_name then
         print("Invalid function call format.")
         return nil, nil
@@ -114,6 +119,7 @@ function M.extract_return_type(line, filetype)
     return get_type(current_line, line, var_name)
 end
 
+-- jack frost
 local function search(arg, start_line)
     -- search backward
     vim.fn.cursor(start_line, 1)

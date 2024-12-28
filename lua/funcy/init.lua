@@ -1,6 +1,7 @@
 local utility = require('utility')
 local default_config = require('config.config')
 local parser = require('function_parser')
+local tabstop = require('tabstop')
 
 local funcy = {
     config = default_config,
@@ -63,17 +64,24 @@ local function generate_function_definition(function_name, args, line)
     end
 
     local params, known_types = parser.generate_params(args) -- param names
-    local types = parser.extract_arg_types(args, filetype, known_types) -- here
+    local types = parser.extract_arg_types(args, filetype, known_types)
     local return_type = parser.extract_return_type(line, filetype)
+
+    local placeholders = {}
 
     -- prompt for types if no types
     if template.type_sensitive then
-        if not types and #args > 0 then
-            types = parser.prompt_for_types(args)
+        for i, param in ipairs(params) do
+            if not types[i] and #args > 0 then
+                types[i] = string.format("<<%s_type>>", param) -- add placeholder
+                -- Save position for cursor jump later
+                table.insert(placeholders, {
+                    param = param,
+                    index = i,
+                })
+            end
         end
-        -- prompt for return type if no return types
         if not return_type then
-            -- add a parser.prompt_for_return_type if you want to prompt the user
             return_type = template.default_type
         end
     end
@@ -83,12 +91,12 @@ local function generate_function_definition(function_name, args, line)
     local function_def = utility.format_header(function_name, params, types, return_type, filetype)
 
     -- add body to header
-    for _, arg in ipairs(args) do
-        function_def = function_def .. string.format(template.body, indent, arg)
+    for i, arg in ipairs(args) do
+        function_def = function_def .. string.format(template.body, indent, params[i], arg)
     end
     function_def = function_def .. template.footer
 
-    return function_def
+    return function_def, placeholders
 end
 
 -- Main function to create the function
@@ -96,6 +104,7 @@ function funcy.create_function(mode)
     local filetype = vim.api.nvim_buf_get_option(0, "filetype")
     local insert_line_num = find_insert_position(funcy.config.insert_strategy)
     local function_lines = {}
+    local all_placeholders = {}
 
     if mode == "visual" then
         local start_line, end_line = vim.fn.line("'<"), vim.fn.line("'>")
@@ -104,9 +113,10 @@ function funcy.create_function(mode)
             vim.api.nvim_win_set_cursor(0, { i, 0 }) -- Explicitly set cursor to this line for LSP to work
             local function_name, args = parser.extract_function_info(line)
             if function_name then
-                local function_def = generate_function_definition(function_name, args, line)
+                local function_def, placeholders = generate_function_definition(function_name, args, line)
                 if function_def then
                     vim.list_extend(function_lines, vim.split(function_def, "\n", true))
+                    vim.list_extend(all_placeholders, placeholders)
                     vim.list_extend(function_lines, { "" }) -- Add a blank line between functions
                 end
             end
@@ -115,15 +125,29 @@ function funcy.create_function(mode)
         local line = vim.api.nvim_get_current_line()
         local function_name, args = parser.extract_function_info(line)
         if not function_name then return end
-        local function_def = generate_function_definition(function_name, args, line)
-        if function_def then
+        local function_def, placeholders = generate_function_definition(function_name, args, line)
+        if function_def and placeholders then
             function_lines = vim.split(function_def, "\n", true)
+            all_placeholders = placeholders
         end
     end
 
     if #function_lines > 0 then
         vim.api.nvim_buf_set_lines(0, insert_line_num, insert_line_num, false, function_lines)
         vim.api.nvim_win_set_cursor(0, { insert_line_num + 1, 0 }) -- Set cursor to the first line of the inserted function
+
+        -- Convert placeholders to absolute positions
+        local positions = {}
+        for _, placeholder in ipairs(all_placeholders) do
+            local line = insert_line_num + placeholder.index - 1
+            local col = vim.fn.strpos(function_lines[line], placeholder.param .. "_type")
+            table.insert(positions, { line = line, col = col })
+        end
+
+        -- Pass positions to tabstop module
+        tabstop.set_placeholders(positions)
+
+        print("Press <Tab> to jump between placeholders.")
     else
         print("No valid function calls found.")
     end

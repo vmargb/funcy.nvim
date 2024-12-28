@@ -1,7 +1,7 @@
 local templates = {
     default = {
         header = "%s %s(%s) {\n", -- Added %s for return type
-        body = "%s// %s = ...\n",
+        body = "%s// %s = %s\n",
         footer = "}\n",
         type_sensitive = false,
         var_pattern = "^%s*[%w_:]+%s+",
@@ -11,21 +11,21 @@ local templates = {
     },
     lua = {
         header = "function %s(%s)\n", -- No explicit return type in Lua
-        body = "%s-- %s = ...\n",
+        body = "%s-- %s = %s\n",
         footer = "end\n",
         type_sensitive = false,
         type_pos = "end" -- Can use type hints with comments
     },
     javascript = {
         header = "function %s(%s) {\n", -- No explicit return type in JS
-        body = "%s// %s = ...\n",
+        body = "%s// %s = %s\n",
         footer = "}\n",
         type_sensitive = false,
         type_pos = "end" -- For JSDoc style type hints
     },
     cpp = {
         header = "%s %s(%s) {\n", -- Added %s for return type
-        body = "%s// %s = ...\n",
+        body = "%s// %s = %s\n",
         footer = "}\n",
         type_sensitive = true,
         default_type = "void",
@@ -34,7 +34,7 @@ local templates = {
     },
     csharp = {
         header = "public static %s %s(%s) {\n", -- Added %s for return type
-        body = "%s// %s = ...\n",
+        body = "%s// %s = %s\n",
         footer = "}\n",
         type_sensitive = true,
         default_type = "void",          -- Added default type
@@ -42,7 +42,7 @@ local templates = {
     },
     java = {
         header = "public static %s %s(%s) {\n", -- Added %s for return type
-        body = "%s// %s = ...\n",
+        body = "%s// %s = %s\n",
         footer = "}\n",
         type_sensitive = true,
         default_type = "Object",
@@ -51,7 +51,7 @@ local templates = {
     },
     python = {
         header = "def %s(%s):\n", -- No explicit return type in Python
-        body = "%s# %s = ...\n",
+        body = "%s# %s = %s\n",
         footer = "    pass\n",
         type_sensitive = false,
         var_pattern = "^%s*([%w_]+)%s*:%s*([%w_%.]+)", -- for type hints
@@ -61,7 +61,7 @@ local templates = {
     },
     typescript = {
         header = "function %s(%s): %s {\n", -- Added %s for return type
-        body = "%s// %s = ...\n",
+        body = "%s// %s = %s\n",
         footer = "}\n",
         type_sensitive = false,
         default_type = "any",
@@ -71,7 +71,7 @@ local templates = {
     },
     go = {
         header = "func %s(%s) %s {\n", -- Added %s for return type
-        body = "%s// %s = ...\n",
+        body = "%s// %s = %s\n",
         footer = "}\n",
         type_sensitive = true,
         default_type = "interface{}", -- Added default type
@@ -81,7 +81,7 @@ local templates = {
     },
     rust = {
         header = "fn %s(%s) -> %s {\n", -- Added -> %s for return type
-        body = "%s// %s = ...\n",
+        body = "%s// %s = %s\n",
         footer = "}\n",
         type_sensitive = true,
         default_type = "()",       -- Added default type
@@ -91,7 +91,7 @@ local templates = {
     },
     swift = {
         header = "func %s(%s) -> %s {\n", -- Added -> %s for return type
-        body = "%s// %s = ...\n",
+        body = "%s// %s = %s\n",
         footer = "}\n",
         type_sensitive = true,
         default_type = "Void",     -- Added default type
@@ -99,7 +99,7 @@ local templates = {
     },
     kotlin = {
         header = "fun %s(%s): %s {\n", -- Added : %s for return type
-        body = "%s// %s = ...\n",
+        body = "%s// %s = %s\n",
         footer = "}\n",
         type_sensitive = true,
         default_type = "Unit",     -- Added default type
@@ -107,7 +107,7 @@ local templates = {
     },
     scala = {
         header = "def %s(%s): %s = {\n", -- Added : %s for return type
-        body = "%s// %s = ...\n",
+        body = "%s// %s = %s\n",
         footer = "}\n",
         type_sensitive = true,
         default_type = "Unit",     -- Added default type

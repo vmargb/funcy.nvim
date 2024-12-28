@@ -32,7 +32,7 @@ function M.format_params(args, types, filetype, type_pos)
         return table.concat(args, ", ")
     end
 
-    local separator = M.template(filetype).type_separator or " " -- Default to `:` for most languages
+    local separator = M.template(filetype).type_separator or " " -- default to empty space
 
     local formatted = {}
     for i, arg in ipairs(args) do

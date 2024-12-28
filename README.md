@@ -2,7 +2,12 @@
 > [!WARNING]
 > This plugin is in early development and may be subject to breaking changes.
 
-A snippets plugin for function definitions using Regex and LSP.
+`funcy.nvim` lets you easily create function definitions using Regex and LSP.
+
+## 🌟 Features
+- **Function completions**: generate definitions from function calls (wip)
+- **Variable completions**: create undeclared variables (TODO)
+- **Tabstops with <Tab>**: repeatable jumps to next argument or variable (wip)
 
 ## 📦 Installation
 

@@ -2,9 +2,10 @@ local utility = require('utility')
 local default_config = require('config.config')
 local parser = require('function_parser')
 local tabstop = require('tabstop')
+local generator = require('generator')
 
 local funcy = {
-    config = default_config,
+    config = default_config.defaults,
 }
 
 function funcy.setup(user_config)
@@ -12,91 +13,68 @@ function funcy.setup(user_config)
     funcy.config = vim.tbl_extend("force", funcy.config, user_config or {})
 end
 
+local function generate_function_definition(function_name, args, line, insert_line_num)
+    local filetype = vim.api.nvim_buf_get_option(0, "filetype")
+    local template = utility.template(filetype)
+
+    local params, known_types = parser.generate_params(args) -- param names
+    local types = parser.extract_arg_types(args, filetype, known_types)
+    local return_type = parser.extract_return_type(line, filetype) or template.default_type
+
+    local function_def, placeholders = generator.format_function(
+        function_name, params, types, return_type, template, insert_line_num
+    )
+    local function_lines = vim.split(function_def, "\n", true)
+
+    return function_lines, placeholders
+end
+
 -- where to insert the generated function
 local function find_insert_position(strategy)
     local current_line_num = vim.api.nvim_win_get_cursor(0)[1]
     local buffer_len = vim.api.nvim_buf_line_count(0)
-    local insert_line_num = buffer_len -- Default to end of file
+
+    local filetype = vim.bo.filetype
+    local template = utility.template(filetype)
+
+    local is_function_def = template.header:match("^%s*[%w_:]+") or "^%s*function"
+    local is_class_def = "^%s*class%s" -- Extendable for more precise class patterns per filetype
+    local scope_end_pattern = template.footer:match("^%s*%}") or "^%s*end$"
 
     if strategy == "before_cursor" then
+        -- find an empty line before the cursor
         local empty_line = utility.find_empty_line_before(current_line_num)
         if empty_line and not utility.has_function_between(empty_line, current_line_num - 1) then
             return empty_line
         end
-        -- default to cursor position if nothing is found
+        -- default to the cursor position if no empty line
         return current_line_num
     elseif strategy == "in_scope" then
-        -- find the start and end of the current scope
-        local scope_start, scope_end = nil, nil
+        -- find the start of the current scope
+        local scope_start = nil
         for i = current_line_num, 1, -1 do
             local line = vim.api.nvim_buf_get_lines(0, i - 1, i, false)[1]
-            if utility.is_function_definition(line) or line:match("^%s*class ") then
+            if line:match(is_function_def) or line:match(is_class_def) then
                 scope_start = i
                 break
             end
         end
+
+        -- if scope start is found, find the end of the scope
         if scope_start then
             for i = scope_start + 1, buffer_len do
                 local line = vim.api.nvim_buf_get_lines(0, i - 1, i, false)[1]
-                if utility.is_empty_line(line) or line:match("^%s*end$") then
-                    scope_end = i
-                    break
+                if line:match("^%s*$") or line:match(scope_end_pattern) then
+                    return i
                 end
             end
-        end
-        if scope_end then
-            return scope_end
-        else
-            return scope_start or buffer_len
+            -- if no scope end is found, default to scope start
+            return scope_start
         end
     end
 
     -- default to the end of the file
     return buffer_len
-end
-
-local function generate_function_definition(function_name, args, line)
-    local filetype = vim.api.nvim_buf_get_option(0, "filetype")
-    local template = utility.template(filetype)
-    if not template then
-        print("Unsupported filetype: " .. filetype)
-        return nil
-    end
-
-    local params, known_types = parser.generate_params(args) -- param names
-    local types = parser.extract_arg_types(args, filetype, known_types)
-    local return_type = parser.extract_return_type(line, filetype)
-
-    local placeholders = {}
-
-    -- prompt for types if no types
-    if template.type_sensitive then
-        for i, param in ipairs(params) do
-            if not types[i] and #args > 0 then
-                types[i] = string.format("<<%s_type>>", param) -- add placeholder
-                -- Save position for cursor jump later
-                table.insert(placeholders, {
-                    param = param,
-                    index = i,
-                })
-            end
-        end
-        if not return_type then
-            return_type = template.default_type
-        end
-    end
-
-    local indent = string.rep(" ", vim.api.nvim_buf_get_option(0, "shiftwidth"))
-    -- format template header to include function name, params and return type
-    local function_def = utility.format_header(function_name, params, types, return_type, filetype)
-
-    -- add body to header
-    for i, arg in ipairs(args) do
-        function_def = function_def .. string.format(template.body, indent, params[i], arg)
-    end
-    function_def = function_def .. template.footer
-
-    return function_def, placeholders
 end
 
 -- Main function to create the function
@@ -113,11 +91,11 @@ function funcy.create_function(mode)
             vim.api.nvim_win_set_cursor(0, { i, 0 }) -- Explicitly set cursor to this line for LSP to work
             local function_name, args = parser.extract_function_info(line)
             if function_name then
-                local function_def, placeholders = generate_function_definition(function_name, args, line)
+                local function_def, placeholders = generate_function_definition(function_name, args, line, insert_line_num)
                 if function_def then
-                    vim.list_extend(function_lines, vim.split(function_def, "\n", true))
+                    vim.list_extend(function_lines, function_def)
                     vim.list_extend(all_placeholders, placeholders)
-                    vim.list_extend(function_lines, { "" }) -- Add a blank line between functions
+                    vim.list_extend(function_lines, { "" })
                 end
             end
         end
@@ -125,29 +103,23 @@ function funcy.create_function(mode)
         local line = vim.api.nvim_get_current_line()
         local function_name, args = parser.extract_function_info(line)
         if not function_name then return end
-        local function_def, placeholders = generate_function_definition(function_name, args, line)
+        local function_def, placeholders = generate_function_definition(function_name, args, line, insert_line_num)
         if function_def and placeholders then
-            function_lines = vim.split(function_def, "\n", true)
+            function_lines = function_def
             all_placeholders = placeholders
         end
     end
 
     if #function_lines > 0 then
         vim.api.nvim_buf_set_lines(0, insert_line_num, insert_line_num, false, function_lines)
-        vim.api.nvim_win_set_cursor(0, { insert_line_num + 1, 0 }) -- Set cursor to the first line of the inserted function
+        vim.api.nvim_win_set_cursor(0, { insert_line_num + 1, 0 })
 
-        -- Convert placeholders to absolute positions
-        local positions = {}
-        for _, placeholder in ipairs(all_placeholders) do
-            local line = insert_line_num + placeholder.index - 1
-            local col = vim.fn.strpos(function_lines[line], placeholder.param .. "_type")
-            table.insert(positions, { line = line, col = col })
+        if #all_placeholders > 0 then
+            tabstop.set_placeholders(all_placeholders)
+            print("Placeholders set. Press <Tab> to jump.")
+        else
+            print("No placeholders found.")
         end
-
-        -- Pass positions to tabstop module
-        tabstop.set_placeholders(positions)
-
-        print("Press <Tab> to jump between placeholders.")
     else
         print("No valid function calls found.")
     end
@@ -168,6 +140,7 @@ end, { nargs = 0, range = true })
 -- mappings
 vim.api.nvim_set_keymap("n", "<leader>cf", ":CreateFunc<CR>", { noremap = true, silent = true })
 vim.api.nvim_set_keymap("v", "<leader>cf", ":CreateFuncs<CR>", { noremap = true, silent = true })
+vim.api.nvim_set_keymap("n", "<Tab>", "<Cmd>lua require('tabstop').jump_to_next()<CR>", { noremap = true, silent = true })
 
 -- Example for testing:
 -- my_function1(arg1, arg2)

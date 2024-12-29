@@ -18,17 +18,16 @@ function M.jump_to_next()
     end
 
     local buf = vim.api.nvim_get_current_buf()
-    -- wrap around
     local current_index = placeholders.index or 0
     current_index = (current_index % #placeholders.positions) + 1
     placeholders.index = current_index
 
     local pos = placeholders.positions[current_index]
-    local line = pos.line - 1
-    local col = pos.col
-
-    -- move cursor to the placeholder
-    vim.api.nvim_win_set_cursor(0, { line + 1, col })
+    vim.api.nvim_win_set_cursor(0, { pos.row, pos.col })
+    -- vim.cmd("normal! b")
+    -- vim.cmd("normal! viw")
+    -- vim.cmd("normal! c")
+    -- vim.cmd("normal! w")
     vim.cmd("startinsert")
 end
 

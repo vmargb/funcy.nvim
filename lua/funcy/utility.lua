@@ -29,33 +29,47 @@ end
 function M.format_params(args, types, filetype, type_pos)
     local requires_types = M.is_type_sensitive(filetype)
     if not requires_types then
-        return table.concat(args, ", ")
+        local params = table.concat(args, ", ")
+        local positions = {}
+        local col = 1
+        for _, arg in ipairs(args) do
+            table.insert(positions, { col = col })
+            col = col + #arg + 2 -- Account for ", "
+        end
+        return params, positions
     end
 
     local separator = M.template(filetype).type_separator or " " -- default to empty space
-
     local formatted = {}
+    local positions = {}
+    local col = 1
+
     for i, arg in ipairs(args) do
+        local param_str = ""
         if types and types[i] then
             if type_pos == "start" then
-                table.insert(formatted, types[i] .. " " .. arg)
+                param_str = types[i] .. " " .. arg
             elseif type_pos == "end" then
-                table.insert(formatted, arg .. separator .. types[i])
+                param_str = arg .. separator .. types[i]
             end
         else
             -- If no type is provided, just use the argument name
-            table.insert(formatted, arg)
+            param_str = arg
         end
+
+        table.insert(positions, { col = col })
+        table.insert(formatted, param_str)
+        col = col + #param_str + 2 -- Account for ", "
     end
 
-    return table.concat(formatted, ", ")
+    return table.concat(formatted, ", "), positions
 end
 
 function M.format_header(function_name, args, types, return_type, filetype)
     local template = templates[filetype] or templates.default
     local type_pos = template.type_pos
 
-    local formatted_params = M.format_params(args, types, filetype, type_pos)
+    local formatted_params, positions = M.format_params(args, types, filetype, type_pos)
     local header = ""
 
     if type_pos == "start" then
@@ -64,7 +78,13 @@ function M.format_header(function_name, args, types, return_type, filetype)
         header = string.format(template.header, function_name, formatted_params, return_type)
     end
 
-    return header
+    -- Calculate parameter column positions relative to the full header
+    local function_start_col = #function_name + 2 -- Account for "function_name("
+    for _, pos in ipairs(positions) do
+        pos.col = pos.col + function_start_col
+    end
+
+    return header, positions
 end
 
 -- Check if a line contains a function definition based on templates

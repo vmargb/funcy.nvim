@@ -30,7 +30,8 @@ local templates = {
         type_sensitive = true,
         default_type = "void",
         var_pattern = "^%s*([%w_:]*)%s*([%w_]+)%s*[=;]",
-        type_pos = "start"
+        type_pos = "start",
+        type_separator = " ",
     },
     csharp = {
         header = "public static %s %s(%s) {\n", -- Added %s for return type

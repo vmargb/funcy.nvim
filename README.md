@@ -7,7 +7,7 @@
 ## 🌟 Features
 - **Function completions**: generate definitions from function calls (wip)
 - **Variable completions**: create undeclared variables (TODO)
-- **Tabstops with <Tab>**: repeatable jumps to next argument or variable (wip)
+- **Tabstops with Tab**: repeatable jumps to next placeholder (wip)
 
 ## 📦 Installation
 
@@ -37,9 +37,10 @@ use {
 ## ⚙️ Configuration
 ```lua
 require("vmargb/funcy.nvim").setup({
-  insert_strategy = "before_cursor",
+  insert_strategy = "end",
   use_arg_names = true,
   prompt_for_types = true,
+  enable_tabstops = true,
 })
 ```
 

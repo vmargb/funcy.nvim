@@ -2,6 +2,7 @@ local util = require('utility')
 
 local M = {}
 
+---@param args table
 function M.prompt_for_types(args)
     local types = {}
     for _, arg in ipairs(args) do
@@ -11,6 +12,7 @@ function M.prompt_for_types(args)
     return types
 end
 
+---@param line string
 function M.extract_function_info(line)
     local function_name, args_str = line:match("([%w_%.]+)%s*%((.-)%)")
     if not function_name then -- multiline support
@@ -45,6 +47,7 @@ function M.extract_function_info(line)
     return function_name, args, types
 end
 
+---@param args table
 function M.generate_params(args)
     local params = {}
     local types = {}
@@ -86,6 +89,10 @@ function M.generate_params(args)
 end
 
 -- line number, line contents, arg
+---@param current_line number
+---@param line string
+---@param var_name string
+---@return string | nil
 local function get_type(current_line, line, var_name)
     local params = {
         textDocument = vim.lsp.util.make_text_document_params(),
@@ -107,6 +114,9 @@ local function get_type(current_line, line, var_name)
     return nil
 end
 
+---@param line string
+---@param filetype string
+---@return string | nil
 function M.extract_return_type(line, filetype)
     if not util.is_type_sensitive(filetype) then return nil end
 
@@ -120,6 +130,9 @@ function M.extract_return_type(line, filetype)
 end
 
 -- jack frost
+---@param arg string
+---@param start_line number
+---@return number
 local function search(arg, start_line)
     -- search backward
     vim.fn.cursor(start_line, 1)
@@ -132,6 +145,9 @@ local function search(arg, start_line)
     return vim.fn.search("\\<" .. vim.fn.escape(arg, "\\") .. "\\>", "nW")
 end
 
+---@param args table
+---@param filetype string
+---@param known_types table
 function M.extract_arg_types(args, filetype, known_types)
     if not util.is_type_sensitive(filetype) then return nil end
 

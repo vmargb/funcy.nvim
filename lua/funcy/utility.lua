@@ -26,6 +26,10 @@ function M.var_pattern(filetype)
     return templates[filetype].var_pattern or false
 end
 
+---@param args table
+---@param types table
+---@param filetype string
+---@param type_pos string
 function M.format_params(args, types, filetype, type_pos)
     local requires_types = M.is_type_sensitive(filetype)
     if not requires_types then
@@ -36,8 +40,7 @@ function M.format_params(args, types, filetype, type_pos)
             table.insert(positions, { col = col })
             col = col + #arg + 2 -- Account for ", "
         end
-        return params, positions
-    end
+        return params, positions end
 
     local separator = M.template(filetype).type_separator or " " -- default to empty space
     local formatted = {}
@@ -65,6 +68,11 @@ function M.format_params(args, types, filetype, type_pos)
     return table.concat(formatted, ", "), positions
 end
 
+---@param function_name string
+---@param args table
+---@param types table
+---@param return_type string
+---@param filetype string
 function M.format_header(function_name, args, types, return_type, filetype)
     local template = templates[filetype] or templates.default
     local type_pos = template.type_pos
@@ -88,6 +96,7 @@ function M.format_header(function_name, args, types, return_type, filetype)
 end
 
 -- Check if a line contains a function definition based on templates
+---@param line string
 function M.is_function_definition(line)
     local filetype = vim.api.nvim_buf_get_option(0, "filetype")
     local template = templates[filetype] or templates.default
@@ -99,6 +108,7 @@ function M.is_function_definition(line)
 end
 
 -- Find the nearest empty line before a given line
+---@param line_num number
 function M.find_empty_line_before(line_num)
     for i = line_num - 1, 1, -1 do
         local line = vim.api.nvim_buf_get_lines(0, i - 1, i, false)[1]
@@ -110,6 +120,8 @@ function M.find_empty_line_before(line_num)
 end
 
 -- Check if any function definition exists between two lines
+---@param start_line number
+---@param end_line number
 function M.has_function_between(start_line, end_line)
     for i = start_line, end_line do
         local line = vim.api.nvim_buf_get_lines(0, i - 1, i, false)[1]

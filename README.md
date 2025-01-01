@@ -2,12 +2,13 @@
 > [!WARNING]
 > This plugin is in early development and may be subject to breaking changes.
 
-`funcy.nvim` lets you easily create function definitions using Regex and LSP.
+`funcy.nvim` lets you easily create and refactor functions using Regex and LSP.
 
-## 🌟 Features
-- **Function completions**: generate definitions from function calls (wip)
-- **Variable completions**: create undeclared variables (TODO)
-- **Tabstops with Tab**: repeatable jumps to next placeholder (wip)
+## 🎉 Features
+- **Functions**: create definitions from function calls or vice versa
+- **Variables**: create undeclared arguments (wip)
+- **Parameters**: refactor argument conflicts (TODO)
+- **Tabstops**: repeatable jumps to next placeholder (wip)
 
 ## 📦 Installation
 

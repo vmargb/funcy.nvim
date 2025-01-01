@@ -8,11 +8,17 @@ local funcy = {
     config = default_config.defaults,
 }
 
+---@param user_config table
 function funcy.setup(user_config)
     -- change defaults
     funcy.config = vim.tbl_extend("force", funcy.config, user_config or {})
 end
 
+---@param function_name string
+---@param args table
+---@param line string
+---@param insert_line_num number
+---@return string[], table
 local function generate_function_definition(function_name, args, line, insert_line_num)
     local filetype = vim.api.nvim_buf_get_option(0, "filetype")
     local template = utility.template(filetype)
@@ -30,6 +36,8 @@ local function generate_function_definition(function_name, args, line, insert_li
 end
 
 -- where to insert the generated function
+---@param strategy string
+---@return number
 local function find_insert_position(strategy)
     local current_line_num = vim.api.nvim_win_get_cursor(0)[1]
     local buffer_len = vim.api.nvim_buf_line_count(0)
@@ -78,6 +86,7 @@ local function find_insert_position(strategy)
 end
 
 -- Main function to create the function
+---@param mode string
 function funcy.create_function(mode)
     local filetype = vim.api.nvim_buf_get_option(0, "filetype")
     local insert_line_num = find_insert_position(funcy.config.insert_strategy)
@@ -123,6 +132,11 @@ function funcy.create_function(mode)
     else
         print("No valid function calls found.")
     end
+end
+
+---@param strategy string
+function funcy.set_strategy(strategy)
+    funcy.config.insert_strategy = strategy
 end
 
 vim.api.nvim_create_user_command("SetCallStrategy", function(opts)

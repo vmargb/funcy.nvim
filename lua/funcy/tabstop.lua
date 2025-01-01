@@ -5,6 +5,7 @@ local placeholders = {
     index = 0,
 }
 
+---@param placeholder_list table
 function M.set_placeholders(placeholder_list)
     placeholders.positions = placeholder_list
     placeholders.index = 0
